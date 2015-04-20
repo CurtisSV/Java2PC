@@ -1,0 +1,12 @@
+lookupParticipants
+addParticipant
+participant.receivePrepare() aboutToBeCalled
+receiveVote
+addParticipant
+participant.receivePrepare() aboutToBeCalled
+receiveVote
+broadcastCommit
+participant.receiveCommit() aboutToBeCalled
+participant.receiveCommit() aboutToBeCalled
+receiveAck
+receiveAck
