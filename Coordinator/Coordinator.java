@@ -27,6 +27,7 @@ public class Coordinator implements CoordinatorInterface {
     //private int voteAbortTally; //one abort suffices
     private boolean[] ackCommitArray = {false,false}; //new boolean[2];  
     private boolean[] ackAbortArray = {false,false}; //new boolean[2]; 
+    private String fail; 
 
 	private Coordinator() {
         super();
@@ -34,19 +35,19 @@ public class Coordinator implements CoordinatorInterface {
 
     /*broadcast*/
     private synchronized void broadcastPrepare(){
-        logString("broadcastPrepare"); 
+        logString("About To broadcastPrepare"); readInput();
         for(ParticipantInterface participant : this.participants){
     		this.createThread(participant); 
     	}
     }
     private void broadcastGlobalCommit(){
-        logString("broadcastCommit"); 
+        logString("About To broadcastCommit"); readInput();
         for(ParticipantInterface participant : this.participants){
             this.createThread(participant); 
         }
     }
     private synchronized void broadcastGlobalAbort(){
-        logString("broadcastAbort"); 
+        logString("About to broadcastAbort"); readInput();
         for(ParticipantInterface participant : this.participants){
             this.createThread(participant); 
         }
@@ -56,7 +57,11 @@ public class Coordinator implements CoordinatorInterface {
         final ParticipantInterface participant = tempParticipant; 
         if(this.state.equals("abort")){ //UsedForBroadCastAbort
             (new Thread(){ public synchronized void run(){
-                try { participant.receiveAbort(); }
+                try { 
+                    logString("participant.receiveAbort() aboutToBeCalled"); 
+                    readInput();
+                    participant.receiveAbort(); 
+                }
                 catch (Exception e) { //remote exception == participant siteFailure. 
                     //Coordinator.this.participants.remove(participant); 
                 }
@@ -66,8 +71,8 @@ public class Coordinator implements CoordinatorInterface {
         if(this.state.equals("commit")){ //usedForBroadCastCommit
             (new Thread(){ public synchronized void run(){
                 try { 
-                    Thread.sleep(1000); 
                     logString("participant.receiveCommit() aboutToBeCalled"); 
+                    readInput();
                     participant.receiveCommit(); 
                 }
                 catch (Exception e) { //remote exception == siteFailure. 
@@ -78,8 +83,8 @@ public class Coordinator implements CoordinatorInterface {
         if(this.state.equals("initial")) {//UsedForBroadCastPrepare
             (new Thread(){ public synchronized void run(){
                 try { 
-                    Thread.sleep(1000); 
                     logString("participant.receivePrepare() aboutToBeCalled"); 
+                    readInput();
                     participant.receivePrepare(); 
                 }
                 catch (Exception e) { //remote exception == siteFailure. 
@@ -94,7 +99,7 @@ public class Coordinator implements CoordinatorInterface {
     /*Receive*/
 
     public synchronized void receiveVote(String abortOrCommit, int participantNum){
-        logString("receiveVote"); 
+        logString("receiveVote:" + abortOrCommit); readInput();
         if(abortOrCommit.equals("commit")){
             voteCommitArray[participantNum] = true; 
             if(allVoted(voteCommitArray)){
@@ -109,8 +114,7 @@ public class Coordinator implements CoordinatorInterface {
         }
     }
     public synchronized void receiveAck(String abortOrCommit, int participantNum){
-        //this method could be compressed a bit...
-        logString("receiveAck"); 
+        logString("receiveAck:" + abortOrCommit); readInput();
         if(abortOrCommit.equals("commit")){
             ackCommitArray[participantNum] = true; 
             if(allVoted(ackCommitArray)){
@@ -137,13 +141,13 @@ public class Coordinator implements CoordinatorInterface {
     }
 
     public synchronized void addParticipant(ParticipantInterface participant, int participantNum){
-        logString("addParticipant"); 
+        logString("addParticipant"); readInput();
         this.participants[participantNum] = participant; 
         this.createThread(participant); 
     }
 
     private synchronized void lookupParticipants(){
-        logString("lookupParticipants"); 
+        logString("lookupParticipants"); readInput();
         Registry registry; /*participantRegistry*/ //(assuming both participants have same registry)
         try{
             registry = LocateRegistry.getRegistry(); /*LocateRegistry.getRegistry("localhost");*/
@@ -165,8 +169,9 @@ public class Coordinator implements CoordinatorInterface {
 
     private synchronized void logState(){
         try {
-            BufferedWriter bw = new BufferedWriter(new FileWriter(new File("./coordinatorState.txt"), false)); 
+            BufferedWriter bw = new BufferedWriter(new FileWriter(new File("./logs/coordinatorState.txt"), false)); 
             bw.write(this.state);
+            System.out.println("this.state= " + this.state); 
             bw.close();
         }catch (Exception ex) {
             System.out.println(ex.toString());
@@ -175,14 +180,22 @@ public class Coordinator implements CoordinatorInterface {
 
     private synchronized void logString(String mystring){
         try {
-            File log = new File("./Coordinator0Log.txt"); 
+            File log = new File("./logs/Coordinator0Log.txt"); 
             if(!log.exists()){log.createNewFile();}
             BufferedWriter bw = new BufferedWriter(new FileWriter(log , true)); 
             bw.write(mystring+"\n");
+            System.out.println(mystring); 
             bw.close();
         }catch (Exception ex) {
             System.out.println(ex.toString());
-        }    
+        }
+    }
+
+   private synchronized void readInput(){ 
+        String input = System.console().readLine("\tType:Enter=>continue,fail=>system.exit()"); 
+        if(input.equals("fail")){
+            System.exit(0); 
+        }
     }
 
 
@@ -190,10 +203,11 @@ public class Coordinator implements CoordinatorInterface {
 
 
 	public synchronized static void main(String[] args) {
-        if (System.getSecurityManager() == null) {
-            System.setSecurityManager(new SecurityManager());
-        }
+        // if (System.getSecurityManager() == null) {
+        //     System.setSecurityManager(new SecurityManager());
+        // }
         Coordinator coordinator = new Coordinator();
+        coordinator.fail = args[0]; 
         try { //register the coordinator in the registry
             CoordinatorInterface stub = 
                 (CoordinatorInterface) UnicastRemoteObject.exportObject(coordinator, 0);
@@ -204,14 +218,17 @@ public class Coordinator implements CoordinatorInterface {
             e.printStackTrace();
         }
         try { //Initialize this object...
-            File file = new  File("./coordinatorState.txt"); 
+            File file = new  File("./logs/coordinatorState.txt"); 
 
             if (file.exists()) { //The site is recovering!!
                 Scanner s = new Scanner(file); 
                 coordinator.state = s.useDelimiter("\\Z").next();
                 s.close(); 
+                coordinator.logString("recovering"); coordinator.readInput();
 
                 coordinator.lookupParticipants();
+                //lookUpParticipants will use coordinator.state to decide what to do
+                //to decide what to do after it's found the participants. 
             }
             else{ //The site is being initialized
                 coordinator.state = "initial"; 

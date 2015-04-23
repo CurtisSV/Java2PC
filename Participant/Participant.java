@@ -16,52 +16,113 @@ public class Participant implements ParticipantInterface {
 	private String state = "initial"; 
     private CoordinatorInterface coordinator; 
     private int participantNum; 
+    private String fail; 
 
 	public void receivePrepare(){
 		this.state = "ready"; 
         logString("receivedPrepare"); 
-		try{coordinator.receiveVote("commit", this.participantNum);}
-		catch(Exception e){ //coordinator failure. 
-            //block==DoNothing
-            logString("receivePrepareException"); 
-		} 
+        String vote = readVoteInput(); 
+
+        for(int i = 0; i<3; i++){
+            try{
+                System.out.println("aboutToSendVote:" + vote); 
+                coordinator.receiveVote(vote, this.participantNum);
+                return;
+            }
+            catch(Exception e){ //coordinator failure. 
+                //block==DoNothing
+                logString("receiveVote('commit') Exception"); 
+                lookupCoordinator(); 
+                // this.receivePrepare();
+            } 
+        }
+
 	}
 
     public void receiveAbort(){
-        logString("receivedAbort"); 
-        this.state = "abort"; 
-        try{coordinator.receiveAck("abort", this.participantNum);}
-        catch(Exception e){} //do nothing
+        this.state = "abort";
+        logString("receivedAbort"); readInput(); 
+        try{
+            System.out.println("aboutToSendAck:" + this.state); 
+            coordinator.receiveAck("abort", this.participantNum);
+        }
+        catch(Exception e){
+            logString("coordinator.receiveAck('abort') Exception");
+            lookupCoordinator();
+            this.receiveAbort();
+        } //do nothing
 
     }
 
     public void receiveCommit(){
-        logString("receivedCommit"); 
         this.state = "commit"; 
-        try{coordinator.receiveAck("commit", this.participantNum);}
-        catch(Exception e){} //do nothing. 
+        logString("receivedCommit"); readInput();
+
+        retryCommit: 
+        try{
+            System.out.println("aboutToSendAck:" + this.state); 
+            coordinator.receiveAck("commit", this.participantNum);
+        }
+        catch(Exception e){
+            logString("coordinator.receiveAck('commit') Exception");
+            lookupCoordinator();
+            break retryCommit; 
+            //this.receiveCommit();
+        } //do nothing. 
     }
 
     private synchronized void logString(String mystring){
+        System.out.println("this.state:" +  this.state); 
         try {
-            File log = new File("./Participant"+ participantNum + "Log.txt"); 
+            File log = new File("./logs/Participant"+ participantNum + "Log.txt"); 
             if(!log.exists()){log.createNewFile();}
             BufferedWriter bw = new BufferedWriter(new FileWriter(log , true)); 
             bw.write(mystring+"\n");
+            System.out.println(mystring); 
             bw.close();
         }catch (Exception ex) {
             System.out.println(ex.toString());
-        }    
+        }
+    }
+
+    private synchronized String readVoteInput(){
+        String input = System.console().readLine("\tPleaseVote: commit XOR abort"); 
+        if(input.equals("abort")){ return "abort"; }
+        else if(input.equals("commit")){return "commit";}
+        else{
+            System.out.println("incorrectInput VoteAgain"); 
+            return this.readVoteInput();
+        }
+    }
+
+
+   private synchronized void readInput(){ 
+        String input = System.console().readLine("\tType:Enter=>continue,fail=>system.exit()"); 
+        if(input.equals("fail")){
+            System.exit(0); 
+        }
+    }
+
+    private synchronized void lookupCoordinator(){
+        try {
+            Registry registry /*participantRegistry*/ = LocateRegistry.getRegistry(); 
+            this.coordinator = 
+                (CoordinatorInterface) registry.lookup("coordinator0");
+        }
+        catch(Exception e){
+            System.out.println("Coordinator Couldn't be re-lookedup"); 
+        }
     }
 
 
 
     public static void main(String args[]) {
-        if (System.getSecurityManager() == null) {
-            System.setSecurityManager(new SecurityManager());
-        }
+        // if (System.getSecurityManager() == null) {
+        //     System.setSecurityManager(new SecurityManager());
+        // }
         try { 
             Participant participant = new Participant();
+            participant.fail = args[1]; 
             ParticipantInterface stub = 
                 (ParticipantInterface) UnicastRemoteObject.exportObject(participant, 0);
             Registry registry /*participantRegistry*/ = LocateRegistry.getRegistry(); 
@@ -75,7 +136,6 @@ public class Participant implements ParticipantInterface {
                 (CoordinatorInterface) registry.lookup("coordinator0");
 
             participant.coordinator.addParticipant(participant, participant.participantNum); 
-
         } catch (Exception e) {
             System.err.println("ComputePi exception:");
             e.printStackTrace();
