@@ -1,3 +1,0 @@
-grant codeBase "file:/Users/curtis/GoogleDrive/Spring2015/CS542_DDBs/2PC_PROJECT" {
-    permission java.security.AllPermission;
-};
