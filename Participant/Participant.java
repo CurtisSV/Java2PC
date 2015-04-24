@@ -23,18 +23,16 @@ public class Participant implements ParticipantInterface {
         logString("receivedPrepare"); 
         String vote = readVoteInput(); 
 
-        for(int i = 0; i<3; i++){
-            try{
-                System.out.println("aboutToSendVote:" + vote); 
-                coordinator.receiveVote(vote, this.participantNum);
-                return;
-            }
-            catch(Exception e){ //coordinator failure. 
-                //block==DoNothing
-                logString("receiveVote('commit') Exception"); 
-                lookupCoordinator(); 
-                // this.receivePrepare();
-            } 
+        try{
+            System.out.println("aboutToSendVote:" + vote); 
+            coordinator.receiveVote(vote, this.participantNum);
+            return;
+        }
+        catch(Exception e){ //coordinator failure. 
+            //block==DoNothing
+            logString("receiveVote('commit') Exception"); 
+            lookupCoordinator(); 
+            // this.receivePrepare();
         }
 
 	}
@@ -48,8 +46,8 @@ public class Participant implements ParticipantInterface {
         }
         catch(Exception e){
             logString("coordinator.receiveAck('abort') Exception");
-            lookupCoordinator();
-            this.receiveAbort();
+            //lookupCoordinator();
+            //this.receiveAbort();
         } //do nothing
 
     }
@@ -57,18 +55,17 @@ public class Participant implements ParticipantInterface {
     public void receiveCommit(){
         this.state = "commit"; 
         logString("receivedCommit"); readInput();
+ 
 
-        retryCommit: 
         try{
             System.out.println("aboutToSendAck:" + this.state); 
             coordinator.receiveAck("commit", this.participantNum);
         }
         catch(Exception e){
             logString("coordinator.receiveAck('commit') Exception");
-            lookupCoordinator();
-            break retryCommit; 
+            //lookupCoordinator();
             //this.receiveCommit();
-        } //do nothing. 
+        } 
     }
 
     private synchronized void logString(String mystring){
@@ -93,6 +90,10 @@ public class Participant implements ParticipantInterface {
             System.out.println("incorrectInput VoteAgain"); 
             return this.readVoteInput();
         }
+    }
+
+    public synchronized void addCoordinator(CoordinatorInterface coordinator0){
+        this.coordinator = coordinator0; 
     }
 
 
@@ -122,7 +123,6 @@ public class Participant implements ParticipantInterface {
         // }
         try { 
             Participant participant = new Participant();
-            participant.fail = args[1]; 
             ParticipantInterface stub = 
                 (ParticipantInterface) UnicastRemoteObject.exportObject(participant, 0);
             Registry registry /*participantRegistry*/ = LocateRegistry.getRegistry(); 

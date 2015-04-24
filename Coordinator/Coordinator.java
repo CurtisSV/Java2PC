@@ -146,6 +146,7 @@ public class Coordinator implements CoordinatorInterface {
         this.createThread(participant); 
     }
 
+    //used when this site is recovering. 
     private synchronized void lookupParticipants(){
         logString("lookupParticipants"); readInput();
         Registry registry; /*participantRegistry*/ //(assuming both participants have same registry)
@@ -153,6 +154,7 @@ public class Coordinator implements CoordinatorInterface {
             registry = LocateRegistry.getRegistry(); /*LocateRegistry.getRegistry("localhost");*/
             ParticipantInterface temp0 = 
                 (ParticipantInterface) registry.lookup("participant0");
+            temp0.addCoordinator(this); 
             this.addParticipant(temp0, 0); 
         } catch(Exception e){ //multipleFailures
             //wait for the participant to come back online. 
@@ -161,7 +163,8 @@ public class Coordinator implements CoordinatorInterface {
             registry = LocateRegistry.getRegistry(); /*LocateRegistry.getRegistry("localhost");*/
             ParticipantInterface temp1 = 
                 (ParticipantInterface) registry.lookup("participant1");
-            this.addParticipant(temp1, 1); 
+            temp1.addCoordinator(this);
+            this.addParticipant(temp1, 1);  
         } catch(Exception e){ //multipleFailures
             //wait for the participant to come back online. 
         }
@@ -207,7 +210,6 @@ public class Coordinator implements CoordinatorInterface {
         //     System.setSecurityManager(new SecurityManager());
         // }
         Coordinator coordinator = new Coordinator();
-        coordinator.fail = args[0]; 
         try { //register the coordinator in the registry
             CoordinatorInterface stub = 
                 (CoordinatorInterface) UnicastRemoteObject.exportObject(coordinator, 0);
@@ -227,7 +229,7 @@ public class Coordinator implements CoordinatorInterface {
                 coordinator.logString("recovering"); coordinator.readInput();
 
                 coordinator.lookupParticipants();
-                //lookUpParticipants will use coordinator.state to decide what to do
+                //lookUpParticipants will use coordinator.state 
                 //to decide what to do after it's found the participants. 
             }
             else{ //The site is being initialized

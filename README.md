@@ -7,13 +7,11 @@ step4: You're done! If you want to run it again, make sure to remove the generat
 Run RMIRegistry: rmiregistry &
 
 RunCoordinator: 
-java -Djava.rmi.server.hostname=127.0.0.1 -Djava.security.debug=access,failure Coordinator/Coordinator dontFail
-//"FailBroadCastCommit"
+java -Djava.rmi.server.hostname=127.0.0.1 -Djava.security.debug=access,failure Coordinator/Coordinator
 
 RunClient: 
-java -Djava.security.debug=access,failure Participant/Participant 0 notFail
-java -Djava.security.debug=access,failure Participant/Participant 1 notFail
-//The first argument is the index, the second argument is whether the participant should fail or not. "failwait"
+java -Djava.security.debug=access,failure Participant/Participant 0 
+java -Djava.security.debug=access,failure Participant/Participant 1 
 //-Djava.security.debug=access,failure
 //-Djava.security.policy=policy.policy
 
